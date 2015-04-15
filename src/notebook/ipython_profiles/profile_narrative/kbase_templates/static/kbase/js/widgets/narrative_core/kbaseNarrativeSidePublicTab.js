@@ -9,12 +9,12 @@
         parent: "kbaseAuthenticatedWidget",
         version: "1.0.0",
         options: {
-		$importStatus:$('<div>'),
+            $importStatus:$('<div>'),
         	addToNarrativeButton: null,
         	selectedItems: null,
         	landing_page_url: "/functional-site/#/", // !! always include trailing slash
-		lp_url: "/functional-site/#/dataview/"
-	    
+        	lp_url: "/functional-site/#/dataview/",
+		    ws_name: null
         },
         token: null,
         wsName: null,
@@ -27,7 +27,7 @@
                      'gwas_top_variations', 'gwas_population_traits', 'gwas_gene_lists'*/ ],
         categoryDescr: {  // search API category -> {}
         	'genomes': {name:'Genomes',type:'KBaseGenomes.Genome',ws:'KBasePublicGenomesV4',search:true},
-        	'metagenomes': {name: 'Metagenomes',type:'KBaseCommunities.Metagenome',ws:'KBasePublicMetagenomes',search:true},
+        	'metagenomes': {name: 'Metagenomes',type:'Communities.Metagenome',ws:'wilke:Data',search:true},
         	'media': {name:'Media',type:'KBaseBiochem.Media',ws:'KBaseMedia',search:false},
         	'plant_gnms': {name:'Plant Genomes',type:'KBaseGenomes.Genome',ws:'PlantCSGenomes',search:false}
         	/*'gwas_populations': {name:'GWAS Populations',type:'KBaseGwasData.GwasPopulation',ws:'KBasePublicGwasDataV2',search:true},
@@ -51,25 +51,33 @@
         init: function(options) {
             this._super(options);
             var self = this;
-	    if (window.kbconfig.urls) {
-		if (window.kbconfig.urls.landing_pages) {
-		    this.options.lp_url = window.kbconfig.urls.landing_pages;
-		}
-	    }
-            $(document).on(
-            		'setWorkspaceName.Narrative', $.proxy(function(e, info) {
-                        //console.log('side panel import tab -- setting ws to ' + info.wsId);
-                        self.wsName = info.wsId;
-                        self.data_icons = window.kbconfig.icons.data;
-                        this.icon_colors = window.kbconfig.icons.colors;
-                        self.render();
-            		}, this)
-            );
+            if (window.kbconfig.urls) {
+                if (window.kbconfig.urls.landing_pages) {
+                    this.options.lp_url = window.kbconfig.urls.landing_pages;
+                }
+            }
+            if (self.options.ws_name) {
+                self.wsName = self.options.ws_name;
+                self.render();
+            } else {
+                $(document).on(
+                        'setWorkspaceName.Narrative', $.proxy(function(e, info) {
+                            //console.log('side panel import tab -- setting ws to ' + info.wsId);
+                            self.wsName = info.wsId;
+                            self.render();
+                        }, this)
+                );
+            }
             return this;
         },
 
         render: function() {
         	var self = this;
+        	if ((!this.token) || (!this.wsName))
+        	    return;
+        	self.$elem.empty();
+            self.data_icons = window.kbconfig.icons.data;
+            self.icon_colors = window.kbconfig.icons.colors;
         	if (!self.data_icons)
         		return;
 
@@ -227,14 +235,14 @@
         				for (var i in data.items) {
         					var id = data.items[i].object_name;
         					var name = data.items[i].metagenome_name;
-        					var project = data.items[i].project_name;
-        					var sample = data.items[i].sample_name;
+        					var sequence_type = data.items[i].sequence_type;
+        					var mix_biome = data.items[i].mix_biome;
         					self.objectList.push({
         						$div: null,
         						info: null,
         						id: id,
         						name: name,
-        						metadata: {'Project': project, 'Sample': sample},
+        						metadata: {'Sequence Type': sequence_type, 'Biome': mix_biome},
         						ws: cat.ws,
         						type: cat.type,
         						attached: false
@@ -409,7 +417,12 @@
 
             var titleElement = $('<span>').css({'margin':'10px'}).append($btnToolbar.hide()).append($name);
             for (var key in object.metadata) {
-            	var value = $('<span>').addClass("kb-data-list-type").append('&nbsp;&nbsp;' + key + ':&nbsp;' + object.metadata[key]);
+                if (!object.metadata.hasOwnProperty(key))
+                    continue;
+                var val = object.metadata[key];
+                if (!val)
+                    val = '-';
+            	var value = $('<span>').addClass("kb-data-list-type").append('&nbsp;&nbsp;' + key + ':&nbsp;' + val);
             	titleElement.append('<br>').append(value);
             }
 
