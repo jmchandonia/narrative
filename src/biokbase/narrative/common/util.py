@@ -12,7 +12,8 @@ from setuptools import Command
 import time
 from .kvp import KVP_EXPR, parse_kvp
 from biokbase.workspace.client import Workspace as WS2
-from biokbase.workspace.client import ServerError, URLError
+from biokbase.workspace.baseclient import ServerError
+from urllib2 import URLError
 
 def kbase_debug_mode():
     return bool(os.environ.get('KBASE_DEBUG', None))
@@ -31,29 +32,31 @@ class _KBaseEnv(object):
     env_narrative  = "KB_NARRATIVE"
     env_session    = "KB_SESSION"
     env_client_ip  = "KB_CLIENT_IP"
-    env_user       = None
+    env_workspace  = "KB_WORKSPACE_ID"
+    env_user       = "KB_USER_ID"
 
     _defaults = {'auth_token': 'none',
                  'narrative': 'none',
                  'session': 'none',
                  'client_ip': '0.0.0.0',
-                 'user': 'anonymous'}
+                 'user': 'anonymous',
+                 'workspace': 'none'}
 
     def __getattr__(self, name):
         ename = "env_" + name
         if ename in _KBaseEnv.__dict__:
-            if ename == 'env_user':
-                return self._user()
-            else:
-                return os.environ.get(getattr(self.__class__, ename),
-                                      self._defaults[name])
+            return os.environ.get(getattr(self.__class__, ename),
+                                  self._defaults[name])
         else:
             raise KeyError("kbase_env:{}".format(name))
 
     def __setattr__(self, name, value):
         ename = "env_" + name
         if ename in _KBaseEnv.__dict__:
-            if ename != 'env_user':
+            env_var = getattr(self.__class__, ename)
+            if value is None and env_var in os.environ:
+                del os.environ[env_var]
+            elif value is not None:
                 os.environ[getattr(self.__class__, ename)] = value
 
     # Dict emulation
